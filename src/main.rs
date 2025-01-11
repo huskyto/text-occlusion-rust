@@ -1,5 +1,5 @@
 
-const HAIR_SPACE: &str = "\u{200A}";
+const HAIR_SPACE: char = '\u{200A}';
 const ZERO_WIDTH_SPACE: char = '\u{200B}';
 const ZERO_WIDTH_NON_JOINER: char = '\u{200C}';
 const ZERO_WIDTH_JOINER: char = '\u{200D}';
@@ -10,21 +10,13 @@ const BASE_4_CODES: [char; 4] = [ZERO_WIDTH_SPACE, ZERO_WIDTH_NON_JOINER,
                                  ZERO_WIDTH_JOINER, WORD_JOINER];
 // const BASE_4_CODES: [char; 4] = ['a', 'b', 'c', 'd'];
 
+const ZONE_CODE: [char; 3] = [ZERO_WIDTH_SPACE, HAIR_SPACE, ZERO_WIDTH_SPACE];
+
 
 fn main() {
-    // println!("Hello, world!");
-
-    let mut example_text = "This is some text!".to_string();
-    example_text.push_str(HAIR_SPACE);
-    example_text.push_str(HAIR_SPACE);
-    example_text.push_str(HAIR_SPACE);
-    example_text.push_str(HAIR_SPACE);
-    example_text.push_str("borka");
-
     let to_hide = "This is some hidden text o:".to_string();
     let b4 = to_base_4(to_hide.as_bytes());
 
-    println!("{example_text}");
     println!("B4: {b4}.");
 
     // println!("Hidden u8: {:#?}", to_hide.as_bytes());
@@ -32,6 +24,16 @@ fn main() {
     // println!("Recovered u8: {:#?}", recovered);
     let rec_str = String::from_utf8(recovered).unwrap();
     println!("Recovered: {rec_str}");
+
+    let tail_hidden = hide_on_tail("Source text", "Hidden text");
+    println!("Tail hidden: {tail_hidden}");
+
+    let th = "Source ​ ​‌​‍​‌‍‍‌‌‍‌​‌‍‌​‌‍‌‌‌‍⁠‍​‍​​‌⁠‌​‌‍‌‌‌⁠‍​‌⁠‌​​ ​text​ ​‌​‍​‌‍‍‌‌‍‌​‌‍‌​‌‍‌‌‌‍⁠‍​‍​​‌⁠‌​‌‍‌‌‌⁠‍​‌⁠‌​​ ​";
+    let tail_recovered = recover_hidden(th);
+    for tr in tail_recovered {
+        let tail_rec_str = String::from_utf8(tr.clone()).unwrap();
+        println!("Tail recovered: {tail_rec_str}");
+    }
 }
 
 fn to_base_4(input: &[u8]) -> String {
@@ -80,21 +82,44 @@ fn from_base_4(input: &str) -> Vec<u8> {
 }
 
 fn get_char_val(c: char) -> u8 {
-        // TODO there must be a better way?
-    if c == BASE_4_CODES[0] {
-        0
+    BASE_4_CODES.iter()
+        .position(|bc| *bc == c)
+        .expect(&format!("Invalid char: {c}")) as u8
+}
+
+fn hide_on_tail(source: &str, to_hide: &str) -> String {
+    let zone_flag: String = get_zone_flag();
+    let coded = to_base_4(to_hide.as_bytes());
+    format!("{source}{zone_flag}{coded}{zone_flag}")
+}
+
+fn recover_hidden(source: &str) -> Vec<Vec<u8>> {
+    let mut res: Vec<Vec<u8>> = vec![];
+    let zone_flag: String = get_zone_flag();
+    let flags: Vec<(usize, &str)> = source.match_indices(&zone_flag).collect();
+    for i in (0..flags.len()).step_by(2) {
+        let start = flags[i].0 + zone_flag.len();
+        let end = flags.get(i + 1).expect("Missing closing flag!").0;
+        let hidden_str = &source[start..end];
+        let recovered = from_base_4(hidden_str);
+        res.push(recovered);
     }
-    else if c == BASE_4_CODES[1] {
-        1
-    }
-    else if c == BASE_4_CODES[2] {
-        2
-    }
-    else if c == BASE_4_CODES[3] {
-        3
-    }
-    else {
-        panic!("Invalid char: {c}")
-    }
-    
+
+    res
+}
+
+fn get_zone_flag() -> String {
+    ZONE_CODE.iter().collect()
+}
+
+#[test]
+fn test_encoding() {
+    let encoded = to_base_4("Hidden text".as_bytes());
+    assert_eq!(encoded, "‌​‍​‌‍‍‌‌‍‌​‌‍‌​‌‍‌‌‌‍⁠‍​‍​​‌⁠‌​‌‍‌‌‌⁠‍​‌⁠‌​");
+}
+
+#[test]
+fn test_decoding() {
+    let decoded = String::from_utf8(from_base_4("‌​‍​‌‍‍‌‌‍‌​‌‍‌​‌‍‌‌‌‍⁠‍​‍​​‌⁠‌​‌‍‌‌‌⁠‍​‌⁠‌​")).unwrap();
+    assert_eq!(decoded, "Hidden text");
 }
