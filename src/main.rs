@@ -3,7 +3,8 @@ use std::fs;
 use clap::{Arg, ArgAction, Command};
 
 
-const HAIR_SPACE: char = '\u{200A}';
+// const HAIR_SPACE: char = '\u{200A}';
+const NO_BREAK_SPACE: char = '\u{00A0}';
 const ZERO_WIDTH_SPACE: char = '\u{200B}';
 const ZERO_WIDTH_NON_JOINER: char = '\u{200C}';
 const ZERO_WIDTH_JOINER: char = '\u{200D}';
@@ -14,7 +15,7 @@ const BASE_4_CODES: [char; 4] = [ZERO_WIDTH_SPACE, ZERO_WIDTH_NON_JOINER,
                                  ZERO_WIDTH_JOINER, WORD_JOINER];
 // const BASE_4_CODES: [char; 4] = ['a', 'b', 'c', 'd'];
 
-const ZONE_CODE: [char; 3] = [ZERO_WIDTH_SPACE, HAIR_SPACE, ZERO_WIDTH_SPACE];
+const ZONE_CODE: [char; 3] = [ZERO_WIDTH_SPACE, NO_BREAK_SPACE, ZERO_WIDTH_SPACE];
 
 
 fn main() {
