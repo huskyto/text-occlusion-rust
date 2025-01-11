@@ -1,3 +1,7 @@
+use std::fs;
+
+use clap::{Arg, ArgAction, Command};
+
 
 const HAIR_SPACE: char = '\u{200A}';
 const ZERO_WIDTH_SPACE: char = '\u{200B}';
@@ -14,25 +18,80 @@ const ZONE_CODE: [char; 3] = [ZERO_WIDTH_SPACE, HAIR_SPACE, ZERO_WIDTH_SPACE];
 
 
 fn main() {
-    let to_hide = "This is some hidden text o:".to_string();
-    let b4 = to_base_4(to_hide.as_bytes());
+    let matches = Command::new("Text Occlusion")
+        .about("Hides and recovers text or binary information in a text file.")
 
-    println!("B4: {b4}.");
+        .arg(Arg::new("tail-hide")
+            .short('t')
+            .long("tailhide")
+            .action(ArgAction::SetTrue)
+            .help("[Action] Sets operation to hide encode and hide text into the input"))
+        .arg(Arg::new("recover")
+            .short('r')
+            .long("recover")
+            .action(ArgAction::SetTrue)
+            .help("[Action] Retrieves the hidden information."))
 
-    // println!("Hidden u8: {:#?}", to_hide.as_bytes());
-    let recovered = from_base_4(&b4);
-    // println!("Recovered u8: {:#?}", recovered);
-    let rec_str = String::from_utf8(recovered).unwrap();
-    println!("Recovered: {rec_str}");
+        .arg(Arg::new("input-file")
+            .short('i')
+            .long("input")
+            .help("Input file that will start seemingly the same. Required."))
+        .arg(Arg::new("output-file")
+            .short('o')
+            .long("output")
+            .help("Modified output file. If not set, will output to stdio."))
+        .arg(Arg::new("hide-file")
+            .short('c')
+            .long("hidefile")
+            .help("File that will be hidden in the input. Required if hiding."))
 
-    let tail_hidden = hide_on_tail("Source text", "Hidden text");
-    println!("Tail hidden: {tail_hidden}");
+        .get_matches();
 
-    let th = "Source ​ ​‌​‍​‌‍‍‌‌‍‌​‌‍‌​‌‍‌‌‌‍⁠‍​‍​​‌⁠‌​‌‍‌‌‌⁠‍​‌⁠‌​​ ​text​ ​‌​‍​‌‍‍‌‌‍‌​‌‍‌​‌‍‌‌‌‍⁠‍​‍​​‌⁠‌​‌‍‌‌‌⁠‍​‌⁠‌​​ ​";
-    let tail_recovered = recover_hidden(th);
-    for tr in tail_recovered {
-        let tail_rec_str = String::from_utf8(tr.clone()).unwrap();
-        println!("Tail recovered: {tail_rec_str}");
+    let flag_tail_hide = matches.get_flag("tail-hide");
+    let flag_recover = matches.get_flag("recover");
+
+    let input_file_opt: Option<String> = matches.get_one::<String>("input-file").cloned();
+    let output_file_opt: Option<String> = matches.get_one::<String>("output-file").cloned();
+    let hide_file_opt: Option<String> = matches.get_one::<String>("hide-file").cloned();
+
+    if !flag_tail_hide && ! flag_recover {
+        panic!("No action flag selected. Run with -h to see options.");
+    }
+
+    if flag_tail_hide && flag_recover {
+        panic!("Only one action flag can be enabled.");
+    }
+
+    if input_file_opt.is_none() {
+        panic!("No input file!");
+    }
+
+    if flag_tail_hide {
+        if hide_file_opt.is_none() {
+            panic!("No file to hide was selected.");
+        }
+        let input_text = fs::read_to_string(input_file_opt.unwrap())
+                .expect("Invalid input file.");
+        let to_hide = fs::read(hide_file_opt.unwrap()).unwrap();
+        let tail_hidden = hide_on_tail(&input_text, &to_hide);
+        if let Some(of) = output_file_opt {
+            let _ = fs::write(of, tail_hidden);
+        }
+        else {
+            println!("{tail_hidden}");
+        }
+    }
+
+    else if flag_recover {
+        let input_text = fs::read_to_string(input_file_opt.unwrap())
+                .expect("Invalid input file.");
+        let recovered = recover_hidden(&input_text)[0].clone();
+        if let Some(of) = output_file_opt {
+            let _ = fs::write(of, recovered);
+        }
+        else {
+            println!("{}", String::from_utf8_lossy(&recovered));
+        }
     }
 }
 
@@ -87,9 +146,9 @@ fn get_char_val(c: char) -> u8 {
         .expect(&format!("Invalid char: {c}")) as u8
 }
 
-fn hide_on_tail(source: &str, to_hide: &str) -> String {
+fn hide_on_tail(source: &str, to_hide: &[u8]) -> String {
     let zone_flag: String = get_zone_flag();
-    let coded = to_base_4(to_hide.as_bytes());
+    let coded = to_base_4(to_hide);
     format!("{source}{zone_flag}{coded}{zone_flag}")
 }
 
